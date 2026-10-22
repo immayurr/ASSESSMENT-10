@@ -2,8 +2,8 @@ pipeline {
     agent any
     
     parameters {
-        string(name: 'DOCKER_TAG', defaultValue: 'v1.0.0', description: 'Target version tag for image publishing')
-        booleanParam(name: 'RUN_TESTS', defaultValue: true, description: 'Toggle client execution tests')
+        string(name: 'DOCKER_TAG', defaultValue: 'latest', description: 'Tag for the Docker image')
+        booleanParam(name: 'RUN_TESTS', defaultValue: true, description: 'Execute verification tests')
     }
     
     environment {
@@ -14,28 +14,40 @@ pipeline {
     }
     
     stages {
-        stage('Parallel Build & Validation') {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Parallel Build & Security Scan') {
             parallel {
-                stage('Build Engine') {
+                stage('Build Docker Image') {
                     steps {
-                        sh "docker build -t ${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG} ."
+                        script {
+                            echo "Building Docker image: ${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG}"
+                            bat "docker build -t %DOCKER_HUB_USER%/%IMAGE_NAME%:${params.DOCKER_TAG} ."
+                        }
                     }
                 }
-                stage('Syntax Lint Verification') {
+                stage('Lint HTML Components') {
                     steps {
-                        sh "grep -q 'Smart Campus Energy' index.html"
+                        echo "Scanning index.html structure..."
+                        bat "findstr /C:\"Smart Campus Energy\" index.html"
                     }
                 }
             }
         }
         
-        stage('Component Verification') {
+        stage('Verify Application') {
             when {
                 expression { return params.RUN_TESTS }
             }
             steps {
-                sh "grep -q 'Science Block' index.html"
-                sh "grep -q 'Engineering Block' index.html"
+                echo "Running client rendering tests..."
+                bat "findstr /C:\"Science Block\" index.html"
+                bat "findstr /C:\"Engineering Block\" index.html"
+                bat "findstr /C:\"Main Library\" index.html"
             }
         }
         
@@ -45,34 +57,35 @@ pipeline {
             }
         }
         
-        stage('Push Image to Registry') {
+        stage('Push to Registry') {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: REGISTRY_CREDENTIALS_ID, usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                        sh "echo '$PASS' | docker login -u '$USER' --password-stdin"
-                        sh "docker push ${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG}"
+                        // FIX: Removed the space before the pipe (|) to prevent trailing whitespace in password
+                        bat "echo %PASS%| docker login -u %USER% --password-stdin"
+                        bat "docker push %DOCKER_HUB_USER%/%IMAGE_NAME%:${params.DOCKER_TAG}"
                     }
                 }
             }
         }
         
-        stage('Kubernetes Orchestrated Rollout') {
+        stage('Deploy to Kubernetes Cluster') {
             steps {
                 script {
                     withKubeConfig([credentialsId: KUBE_CREDENTIALS_ID]) {
-                        // Dynamically update image definitions inside manifest specs
-                        sh "sed -i 's|your-dockerhub-username/smart-campus-energy:latest|${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG}|g' deployment.yaml"
-                        sh "kubectl apply -f deployment.yaml"
+                        // Escaped the PowerShell command properly to prevent string substitution errors
+                        powershell "(Get-Content deployment.yaml) -replace 'your-dockerhub-username/smart-campus-energy:latest', '${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG}' | Set-Content deployment.yaml"
+                        bat "kubectl apply -f deployment.yaml"
                         
-                        echo "Evaluating rollout progress status..."
+                        echo "Verifying Rollout Status..."
                         timeout(time: 2, unit: 'MINUTES') {
                             try {
-                                sh "kubectl rollout status deployment/energy-dashboard-deployment"
+                                bat "kubectl rollout status deployment/energy-dashboard-deployment"
                             } catch (Exception e) {
-                                echo "❌ Faulty release deployment encountered! Reverting infrastructure status..."
-                                sh "kubectl rollout undo deployment/energy-dashboard-deployment"
-                                sh "kubectl rollout status deployment/energy-dashboard-deployment"
-                                error("Rollback executed: The previous stable running container configuration has been successfully restored.")
+                                echo "❌ Rollout failed! Initiating automated recovery rollback..."
+                                bat "kubectl rollout undo deployment/energy-dashboard-deployment"
+                                bat "kubectl rollout status deployment/energy-dashboard-deployment"
+                                error("Deployment failed but system safely rolled back to stable release.")
                             }
                         }
                     }
