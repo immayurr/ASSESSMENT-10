@@ -26,14 +26,14 @@ pipeline {
                     steps {
                         script {
                             echo "Building Docker image: ${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG}"
-                            sh "docker build -t ${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG} ."
+                            bat "docker build -t ${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG} ."
                         }
                     }
                 }
                 stage('Lint HTML Components') {
                     steps {
                         echo "Scanning index.html structure..."
-                        sh "grep -q 'Smart Campus Energy' index.html"
+                        bat "grep -q 'Smart Campus Energy' index.html"
                     }
                 }
             }
@@ -45,9 +45,9 @@ pipeline {
             }
             steps {
                 echo "Running client rendering tests..."
-                sh "grep -q 'Science Block' index.html"
-                sh "grep -q 'Engineering Block' index.html"
-                sh "grep -q 'Main Library' index.html"
+                bat "grep -q 'Science Block' index.html"
+                bat "grep -q 'Engineering Block' index.html"
+                bat "grep -q 'Main Library' index.html"
             }
         }
         
@@ -61,8 +61,8 @@ pipeline {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: REGISTRY_CREDENTIALS_ID, usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                        sh "echo '$PASS' | docker login -u '$USER' --password-stdin"
-                        sh "docker push ${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG}"
+                        bat "echo '$PASS' | docker login -u '$USER' --password-stdin"
+                        bat "docker push ${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG}"
                     }
                 }
             }
@@ -72,17 +72,17 @@ pipeline {
             steps {
                 script {
                     withKubeConfig([credentialsId: KUBE_CREDENTIALS_ID]) {
-                        sh "sed -i 's|your-dockerhub-username/smart-campus-energy:latest|${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG}|g' deployment.yaml"
-                        sh "kubectl apply -f deployment.yaml"
+                        bat "sed -i 's|your-dockerhub-username/smart-campus-energy:latest|${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG}|g' deployment.yaml"
+                        bat "kubectl apply -f deployment.yaml"
                         
                         echo "Verifying Rollout Status..."
                         timeout(time: 2, unit: 'MINUTES') {
                             try {
-                                sh "kubectl rollout status deployment/energy-dashboard-deployment"
+                                bat "kubectl rollout status deployment/energy-dashboard-deployment"
                             } catch (Exception e) {
                                 echo "❌ Rollout failed! Initiating automated recovery rollback..."
-                                sh "kubectl rollout undo deployment/energy-dashboard-deployment"
-                                sh "kubectl rollout status deployment/energy-dashboard-deployment"
+                                bat "kubectl rollout undo deployment/energy-dashboard-deployment"
+                                bat "kubectl rollout status deployment/energy-dashboard-deployment"
                                 error("Deployment failed but system safely rolled back to stable release.")
                             }
                         }
