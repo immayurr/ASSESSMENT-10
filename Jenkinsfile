@@ -61,7 +61,6 @@ pipeline {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: REGISTRY_CREDENTIALS_ID, usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                        // FIX: Removed the space before the pipe (|) to prevent trailing whitespace in password
                         bat "echo %PASS%| docker login -u %USER% --password-stdin"
                         bat "docker push %DOCKER_HUB_USER%/%IMAGE_NAME%:${params.DOCKER_TAG}"
                     }
@@ -73,12 +72,13 @@ pipeline {
             steps {
                 script {
                     withKubeConfig([credentialsId: KUBE_CREDENTIALS_ID]) {
-                        // Escaped the PowerShell command properly to prevent string substitution errors
-                        powershell "(Get-Content deployment.yaml) -replace 'your-dockerhub-username/smart-campus-energy:latest', '${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG}' | Set-Content deployment.yaml"
+                        // FAULTY FAULT INJECTION: Replaces the image with a broken/non-existent tag to force ImagePullBackOff
+                        powershell "(Get-Content deployment.yaml) -replace 'your-dockerhub-username/smart-campus-energy:latest', '${DOCKER_HUB_USER}/${IMAGE_NAME}:invalid-tag-to-force-rollback' | Set-Content deployment.yaml"
                         bat "kubectl apply -f deployment.yaml"
                         
                         echo "Verifying Rollout Status..."
-                        timeout(time: 2, unit: 'MINUTES') {
+                        // Shortened timeout to 30 seconds for quick demonstration of the rollback
+                        timeout(time: 30, unit: 'SECONDS') {
                             try {
                                 bat "kubectl rollout status deployment/energy-dashboard-deployment"
                             } catch (Exception e) {
