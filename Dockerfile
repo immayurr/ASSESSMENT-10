@@ -1,4 +1,6 @@
+# Faulty Dockerfile version
 FROM nginx:alpine
-COPY index.html /usr/share/nginx/html/index.html
+# Intentionally copy index file to an invalid runtime pathway
+COPY index.html /usr/share/nginx/html/missing-pathway/index.html
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
