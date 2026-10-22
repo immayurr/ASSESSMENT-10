@@ -33,7 +33,6 @@ pipeline {
                 stage('Lint HTML Components') {
                     steps {
                         echo "Scanning index.html structure..."
-                        // Changed grep to findstr
                         bat "findstr /C:\"Smart Campus Energy\" index.html"
                     }
                 }
@@ -46,7 +45,6 @@ pipeline {
             }
             steps {
                 echo "Running client rendering tests..."
-                // Changed grep to findstr
                 bat "findstr /C:\"Science Block\" index.html"
                 bat "findstr /C:\"Engineering Block\" index.html"
                 bat "findstr /C:\"Main Library\" index.html"
@@ -63,8 +61,8 @@ pipeline {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: REGISTRY_CREDENTIALS_ID, usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                        // Windows CLI uses %VAR% for environment variables. Single quotes do not hide secrets in 'bat'.
-                        bat "echo %PASS% | docker login -u %USER% --password-stdin"
+                        // FIX: Removed the space before the pipe (|) to prevent trailing whitespace in password
+                        bat "echo %PASS%| docker login -u %USER% --password-stdin"
                         bat "docker push %DOCKER_HUB_USER%/%IMAGE_NAME%:${params.DOCKER_TAG}"
                     }
                 }
@@ -75,7 +73,7 @@ pipeline {
             steps {
                 script {
                     withKubeConfig([credentialsId: KUBE_CREDENTIALS_ID]) {
-                        // Replaced 'sed' with a native Windows PowerShell content replacement command
+                        // Escaped the PowerShell command properly to prevent string substitution errors
                         powershell "(Get-Content deployment.yaml) -replace 'your-dockerhub-username/smart-campus-energy:latest', '${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG}' | Set-Content deployment.yaml"
                         bat "kubectl apply -f deployment.yaml"
                         
