@@ -1,0 +1,40 @@
+<!-- Save as index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart Campus Energy Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; }
+        h1 { text-align: center; color: #333; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .alert { background-color: #ffdddd; border-left: 6px solid #f44336; padding: 10px; margin-top: 10px; color: #b71c1c; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Smart Campus Energy Monitoring System</h1>
+        <div class="grid">
+            <div class="card">
+                <h2>Science Block</h2>
+                <p><strong>Daily Consumption:</strong> 120 kWh</p>
+                <p><strong>Energy-Saving Target:</strong> 90 kWh</p>
+                <div class="alert"><strong>⚠️ ALERT:</strong> Exceeds 100 kWh limit! Excess: 20 kWh</div>
+            </div>
+            <div class="card">
+                <h2>Engineering Block</h2>
+                <p><strong>Daily Consumption:</strong> 85 kWh</p>
+                <p><strong>Energy-Saving Target:</strong> 100 kWh</p>
+            </div>
+            <div class="card">
+                <h2>Main Library</h2>
+                <p><strong>Daily Consumption:</strong> 105 kWh</p>
+                <p><strong>Energy-Saving Target:</strong> 80 kWh</p>
+                <div class="alert"><strong>⚠️ ALERT:</strong> Exceeds 100 kWh limit! Excess: 5 kWh</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
