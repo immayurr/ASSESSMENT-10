@@ -26,14 +26,15 @@ pipeline {
                     steps {
                         script {
                             echo "Building Docker image: ${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG}"
-                            bat "docker build -t ${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG} ."
+                            bat "docker build -t %DOCKER_HUB_USER%/%IMAGE_NAME%:${params.DOCKER_TAG} ."
                         }
                     }
                 }
                 stage('Lint HTML Components') {
                     steps {
                         echo "Scanning index.html structure..."
-                        bat "grep -q 'Smart Campus Energy' index.html"
+                        // Changed grep to findstr
+                        bat "findstr /C:\"Smart Campus Energy\" index.html"
                     }
                 }
             }
@@ -45,9 +46,10 @@ pipeline {
             }
             steps {
                 echo "Running client rendering tests..."
-                bat "grep -q 'Science Block' index.html"
-                bat "grep -q 'Engineering Block' index.html"
-                bat "grep -q 'Main Library' index.html"
+                // Changed grep to findstr
+                bat "findstr /C:\"Science Block\" index.html"
+                bat "findstr /C:\"Engineering Block\" index.html"
+                bat "findstr /C:\"Main Library\" index.html"
             }
         }
         
@@ -61,8 +63,9 @@ pipeline {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: REGISTRY_CREDENTIALS_ID, usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                        bat "echo '$PASS' | docker login -u '$USER' --password-stdin"
-                        bat "docker push ${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG}"
+                        // Windows CLI uses %VAR% for environment variables. Single quotes do not hide secrets in 'bat'.
+                        bat "echo %PASS% | docker login -u %USER% --password-stdin"
+                        bat "docker push %DOCKER_HUB_USER%/%IMAGE_NAME%:${params.DOCKER_TAG}"
                     }
                 }
             }
@@ -72,7 +75,8 @@ pipeline {
             steps {
                 script {
                     withKubeConfig([credentialsId: KUBE_CREDENTIALS_ID]) {
-                        bat "sed -i 's|your-dockerhub-username/smart-campus-energy:latest|${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG}|g' deployment.yaml"
+                        // Replaced 'sed' with a native Windows PowerShell content replacement command
+                        powershell "(Get-Content deployment.yaml) -replace 'your-dockerhub-username/smart-campus-energy:latest', '${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG}' | Set-Content deployment.yaml"
                         bat "kubectl apply -f deployment.yaml"
                         
                         echo "Verifying Rollout Status..."
