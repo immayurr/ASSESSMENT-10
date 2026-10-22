@@ -69,31 +69,28 @@ pipeline {
             }
         }
         
-        stage('Kubernetes Orchestrated Rollout') {
-    steps {
-        script {
-            withKubeConfig([credentialsId: KUBE_CREDENTIALS_ID]) {
-                // Apply the deployment manifest to the cluster
-                sh "kubectl apply -f deployment.yaml"
-                
-                echo "Blocking to evaluate rollout progress status..."
-                // Lower timeout to 30 seconds for quick validation testing
-                timeout(time: 30, unit: 'SECONDS') {
-                    try {
-                        // Crucial: This blocks execution until pods either pass probes or crash
-                        sh "kubectl rollout status deployment/energy-dashboard-deployment"
-                    } catch (Exception e) {
-                        echo "❌ Faulty release deployment encountered! Reverting infrastructure status..."
-                        // Triggers rollback instantly
-                        sh "kubectl rollout undo deployment/energy-dashboard-deployment"
-                        // Force the Jenkins build status to turn RED
-                        error("Rollback executed successfully: Terminating build due to faulty release deployment.")
+        stage('Deploy to Kubernetes Cluster') {
+            steps {
+                script {
+                    withKubeConfig([credentialsId: KUBE_CREDENTIALS_ID]) {
+                        // Escaped the PowerShell command properly to prevent string substitution errors
+                        powershell "(Get-Content deployment.yaml) -replace 'your-dockerhub-username/smart-campus-energy:latest', '${DOCKER_HUB_USER}/${IMAGE_NAME}:${params.DOCKER_TAG}' | Set-Content deployment.yaml"
+                        bat "kubectl apply -f deployment.yaml"
+                        
+                        echo "Verifying Rollout Status..."
+                        timeout(time: 2, unit: 'MINUTES') {
+                            try {
+                                bat "kubectl rollout status deployment/energy-dashboard-deployment"
+                            } catch (Exception e) {
+                                echo "❌ Rollout failed! Initiating automated recovery rollback..."
+                                bat "kubectl rollout undo deployment/energy-dashboard-deployment"
+                                bat "kubectl rollout status deployment/energy-dashboard-deployment"
+                                error("Deployment failed but system safely rolled back to stable release.")
+                            }
+                        }
                     }
                 }
             }
         }
-    }
-}
-
     }
 }
